@@ -115,12 +115,14 @@ svlete: digest: sha256:dba73db3e9d37fc17ea746171020446de87fe42ad663358e52941282b
 ## Phase 3 
 
 Create helm templates
-``
+```
 helm create svlete
 WARNING: Kubernetes configuration file is group-readable. This is insecure. Location: /root/.kube/config
 WARNING: Kubernetes configuration file is world-readable. This is insecure. Location: /root/.kube/config
 Creating svlete
+
 ```
+
 Modify the values.yaml and Chart.yaml for the Imagepath, Pull Policy, Ingress details and tag (Templates are uploaded under helmcart folder)
 
 Installation of helm charts on EKS cluster
