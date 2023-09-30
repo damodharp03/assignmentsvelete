@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template for deploying applications to an EKS Fargate cluster
+
+Parameters:
+  EKSClusterName:
+    Type: String
+    Description: Name of the EKS cluster.
+  GitHubRepository:
+    Type: String
+    Description: GitHub repository URL for your application code.
+  GitHubBranch:
+    Type: String
+    Description: GitHub branch for your application code.
+  GitHubOAuthToken:
+    Type: String
+    Description: GitHub OAuth token with access to your repository.
+    NoEcho: true
+  FargateExecutionRoleArn:
+    Type: String
+    Description: ARN of the IAM role that allows Fargate to execute tasks.
+
+Resources:
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref EKSClusterName
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CodePipelineRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - eks:UpdateClusterConfig
+                Resource: !GetAtt EKSCluster.Arn
+              - Effect: Allow
+                Action:
+                  - codepipeline:*
+                  - s3:*
+                  - cloudformation:*
+                Resource: '*'
+
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: EKSFargateCodePipeline
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              Configuration:
+                Owner: !Sub '${GitHubRepository.split("/")[3]}' # Extract owner from GitHub URL
+                Repo: !Sub '${GitHubRepository.split("/")[4]}'  # Extract repo name from GitHub URL
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubOAuthToken
+              OutputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: EKS
+              Configuration:
+                ClusterName: !Ref EKSClusterName
+                Namespace: default # Namespace where your application should be deployed
+                InputArtifacts:
+                  - Name: SourceOutput
+                RoleArn: !Ref FargateExecutionRoleArn
+                RunOrder: 1
+
+Outputs:
+  CodePipelineUrl:
+    Description: URL of the CodePipeline in the AWS Management Console.
+    Value: !Sub 'https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${CodePipeline}/view'
+

@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create an Amazon EKS cluster with Fargate profiles.
+
+Parameters:
+  ClusterName:
+    Type: String
+    Description: Name for the EKS cluster.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where EKS cluster will be deployed.
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of subnet IDs for the EKS cluster.
+
+Resources:
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref ClusterName
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !GetAtt EKSWorkerSecurityGroup.GroupId
+        SubnetIds: !Ref SubnetIds
+  EKSWorkerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EKS Fargate workers
+      VpcId: !Ref VpcId
+
+  FargateProfile:
+    Type: AWS::EKS::FargateProfile
+    Properties:
+      ClusterName: !Ref EKSCluster
+      FargateProfileName: default
+      PodExecutionRoleArn: <YourPodExecutionRoleArn> # You need to create this IAM role separately
+      Subnets: !Ref SubnetIds
+      Selectors:
+        - Namespace: default # Example selector, you can add more as needed
+
+Outputs:
+  EKSClusterName:
+    Description: The name of the EKS cluster.
+    Value: !Ref EKSCluster
+  EKSConfigCommand:
+    Description: Command to configure kubectl to use the EKS cluster.
+    Value: !Sub "aws eks --region ${AWS::Region} update-kubeconfig --name ${EKSCluster}"
+

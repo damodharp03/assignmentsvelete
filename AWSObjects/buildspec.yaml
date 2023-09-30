@@ -1,0 +1,32 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Installing kubectl...
+      - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - chmod +x kubectl
+      - mv kubectl /usr/local/bin/
+  build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region your-region | docker login --username AWS --password-stdin your-account-id.dkr.ecr.your-region.amazonaws.com
+
+      # Build and tag your Docker image
+      - docker build -t your-image-name .
+      - docker tag your-image-name:latest your-account-id.dkr.ecr.your-region.amazonaws.com/your-image-name:latest
+
+  post_build:
+    commands:
+      # Push the Docker image to Amazon ECR
+      - docker push your-account-id.dkr.ecr.your-region.amazonaws.com/your-image-name:latest
+
+      # Configure kubectl to use your EKS cluster
+      - aws eks --region your-region update-kubeconfig --name your-eks-cluster-name
+
+      # Deploy your application to EKS
+      - kubectl apply -f your-deployment.yaml
+
+artifacts:
+  files: '**/*'
+
